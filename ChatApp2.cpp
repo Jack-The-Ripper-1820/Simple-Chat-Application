@@ -16,20 +16,19 @@ const int STRINGBUFSIZE = 4096;
 void readThread(SOCKET sock) {
     char buf[STRINGBUFSIZE];
     int bytesReceived;
+
     while (true) {
         bytesReceived = recv(sock, buf, STRINGBUFSIZE, 0);
-        std::string message(buf, bytesReceived);
+        string message(buf, bytesReceived);
 
         if (bytesReceived == SOCKET_ERROR) {
-            std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
+            cerr << "recv failed with error: " << WSAGetLastError() << endl;
             break;
         }
-        else if (bytesReceived == 0 || string(buf) == "exit") {
-            std::cout << "Connection closed" << std::endl;
+        else if (string(buf) == "exit") {
             break;
         }
 
-       
         else if (message.substr(0, 9) == "transfer ")
         {
             string fileName = message.substr(9);
@@ -37,47 +36,53 @@ void readThread(SOCKET sock) {
 
             ofstream file(newFileName, ios::binary);
 
-            if (!file.is_open())
-            {
+            if (!file.is_open()) {
                 cerr << "Error: Could not create file " << newFileName << endl;
             }
 
             else {
-                std::cout << "Receiving file " << fileName << endl;
+                cout << "Receiving file " << fileName << endl;
 
-                int bytesRec;
+                int bytesR;
                 char buffer[FILEBUFSIZE];
 
                 do {
-                    bytesRec = recv(sock, buffer, FILEBUFSIZE, 0);
-                    if (bytesRec > 0) {
-                        file.write(buffer, bytesRec);
+                    bytesR = recv(sock, buffer, FILEBUFSIZE, 0);
+                    if (string(buffer) == "&8e913") {
+                        cout << "Receive complete" << endl;
+                        break;
                     }
-                    else if (bytesRec == 0) {
-                        std::cout << "Connection closed or file not present" << endl;
+
+                    else if (bytesR > 0) {
+                        file.write(buffer, bytesR);
+                    }
+                    else if (bytesR == 0) {
+                        cout << "Connection closed or file not present" << endl;
+                        break;
                     }
                     else {
                         cerr << "recv failed: " << WSAGetLastError() << endl;
+                        break;
                     }
-                } while (bytesRec > 0);
-
-                file.close();
+                } while (bytesR > 0);
 
                 cout << "File transaction closed" << endl;
             }
+
+            file.close();
         }
 
         else {
-            std::cout << "Received: " << std::string(buf, 0, bytesReceived) << std::endl;
+            cout << "Received: " << string(buf, 0, bytesReceived) << endl;
         }
     }
 }
 
 void writeThread(SOCKET sock) {
-    std::string input;
+    string input;
     int bytesSent;
     do {
-        std::getline(std::cin, input);
+        getline(cin, input);
         bytesSent = send(sock, input.c_str(), input.size() + 1, 0);
 
         if (input.substr(0, 9) == "transfer ") {
@@ -90,10 +95,10 @@ void writeThread(SOCKET sock) {
 
             else
             {
-                std::cout << "Sending file " << fileName << endl;
+                cout << "Sending file " << fileName << endl;
 
                 char buffer[FILEBUFSIZE];
-                int bytesR, bytesS;
+                int bytesR = 0, bytesS = 0;
 
                 while (!file.eof()) {
                     file.read(buffer, FILEBUFSIZE);
@@ -103,25 +108,28 @@ void writeThread(SOCKET sock) {
 
                     if (bytesS == SOCKET_ERROR) {
                         cerr << "send failed: " << WSAGetLastError() << endl;
-                        file.close();
+                        break;
                     }
 
                     if (bytesS != bytesR) {
                         cerr << "Error: partial send, could not send everything." << endl;
-                        file.close();
+                        break;
                     }
                 }
+                send(sock, "&8e913", 7, 0);
 
-                std::cout << "File sent successfully" << endl;
-                file.close();
+                if(bytesS == bytesR && bytesS != SOCKET_ERROR) cout << "File sent successfully" << endl;
             }
+
+            file.close();
         }
 
 
         else if (bytesSent == SOCKET_ERROR) {
-            std::cerr << "send failed with error: " << WSAGetLastError() << std::endl;
+            cerr << "send failed with error: " << WSAGetLastError() << endl;
             break;
         }
+
         else {
             cout << "sent: " << input << endl;
         }
@@ -132,7 +140,7 @@ int main() {
     WSADATA wsaData;
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
-        std::cerr << "WSAStartup failed with error: " << iResult << std::endl;
+        cerr << "WSAStartup failed with error: " << iResult << endl;
         return 1;
     }
 
@@ -140,7 +148,7 @@ int main() {
     SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (serverSocket == INVALID_SOCKET) {
-        std::cerr << "Failed to create socket: " << WSAGetLastError() << std::endl;
+        cerr << "Failed to create socket: " << WSAGetLastError() << endl;
         WSACleanup();
         return 1;
     }
@@ -152,7 +160,7 @@ int main() {
     serverAddress.sin_port = htons(0);
     iResult = bind(serverSocket, (sockaddr*)&serverAddress, sizeof(serverAddress));
     if (iResult == SOCKET_ERROR) {
-        std::cerr << "Failed to bind socket: " << WSAGetLastError() << std::endl;
+        cerr << "Failed to bind socket: " << WSAGetLastError() << endl;
         closesocket(serverSocket);
         WSACleanup();
         return 1;
@@ -160,7 +168,7 @@ int main() {
 
     iResult = listen(serverSocket, SOMAXCONN);
     if (iResult == SOCKET_ERROR) {
-        std::cerr << "listen failed with error: " << WSAGetLastError() << std::endl;
+        cerr << "listen failed with error: " << WSAGetLastError() << endl;
         closesocket(serverSocket);
         WSACleanup();
         return 1;
@@ -181,7 +189,7 @@ int main() {
     SOCKET otherSock = socket(AF_INET, SOCK_STREAM, 0);
     
     if (otherSock == INVALID_SOCKET) {
-        std::cerr << "Can't create socket, Err #" << WSAGetLastError() << std::endl;
+        cerr << "Can't create socket, Err #" << WSAGetLastError() << endl;
         closesocket(serverSocket);
         closesocket(otherSock);
         WSACleanup();
@@ -196,7 +204,7 @@ int main() {
 
     iResult = connect(otherSock, (sockaddr*)&otherServer, sizeof(otherServer));
     if (iResult == SOCKET_ERROR) {
-        std::cerr << "Can't connect to the other server, Err #" << WSAGetLastError() << std::endl;
+        cerr << "Can't connect to the other server, Err #" << WSAGetLastError() << endl;
         closesocket(otherSock);
         closesocket(serverSocket);
         WSACleanup();
@@ -223,11 +231,13 @@ int main() {
     
     cout << "connection to the other server successful" << endl;
 
-    std::thread t1(readThread, clientSocket);
-    std::thread t2(writeThread, otherSock);
+    thread t1(readThread, clientSocket);
+    thread t2(writeThread, otherSock);
 
     t1.join();
     t2.join();
+
+    cout << "Connection closed" << endl;
 
     closesocket(serverSocket);
     closesocket(clientSocket);
